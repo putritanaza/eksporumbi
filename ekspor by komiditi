@@ -1,0 +1,30 @@
+SELECT
+  a.hs, a.uraian_hs,
+  SUM(CASE WHEN a.tahun = 2025 THEN a.nilai ELSE 0 END) AS nilai_2025,
+	SUM(CASE WHEN a.tahun = 2025 THEN a.volume ELSE 0 END) AS volume_2025
+FROM (
+  SELECT
+    TO_CHAR(t1.tahun, 'MM') AS bulan,
+    DATE_PART('YEAR', t1.tahun) AS tahun,
+    CONCAT(TO_CHAR(t1.tahun, 'MM'), '-', DATE_PART('YEAR', t1.tahun)) AS bulan_tahun,
+    t3.uraian AS nama_prop,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs,
+    t2.uraian_hs,
+    SUM(t1.fobhsusd) AS nilai, 
+		SUM(t1.netwths) AS volume
+  FROM public.eks_2022 t1
+  LEFT JOIN public.master_hs2022 t2 ON t1.hs = t2.hs
+  LEFT JOIN public.master_propinsi t3 ON t1.kd_prop = t3.kd_prop
+  GROUP BY
+    TO_CHAR(t1.tahun, 'MM'),
+    DATE_PART('YEAR', t1.tahun),
+    t3.uraian,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs,
+    t2.uraian_hs
+) a
+GROUP BY a.hs, a.uraian_hs
+ORDER BY SUM(CASE WHEN a.tahun = 2025 THEN a.nilai ELSE 0 END) desc limit 100
