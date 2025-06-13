@@ -1,0 +1,39 @@
+SELECT
+  a.nama_prop,
+	TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2020 THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_2020,
+	TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2021 THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_2021,
+	TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2022 THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_2022,
+	TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2023 THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_2023,
+  TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2024 THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_2024,
+	TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2024 AND CAST(a.bulan AS INTEGER) IN (1, 2, 3, 4) THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_01_04_2024,
+	TO_CHAR(ROUND(SUM(CASE WHEN a.tahun = 2025 THEN a.nilai ELSE 0 END) / 1000000.0, 1), 'FM999G999G999D9') AS nilai_2025
+FROM (
+  SELECT
+    TO_CHAR(t1.tahun, 'MM') AS bulan,
+    DATE_PART('YEAR', t1.tahun) AS tahun,
+    CONCAT(TO_CHAR(t1.tahun, 'MM'), '-', DATE_PART('YEAR', t1.tahun)) AS bulan_tahun,
+    t3.uraian AS nama_prop,
+		t4.pelabuhan AS pelabuhan,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs6,
+    t2.uraian_hs6,
+    SUM(t1.cifhsusd) AS nilai, 
+		SUM(t1.netwths) AS volume
+  FROM public.imp_2022 t1
+  LEFT JOIN public.master_hs2022 t2 ON t1.hs = t2.hs
+  LEFT JOIN public.master_propinsi t3 ON t1.kd_prop = t3.kd_prop
+	LEFT JOIN PUBLIC.master_pelabuhan t4 ON t1.pel_huruf = t4.kd_huruf
+	WHERE t2.sektor_name='NON MIGAS'
+  GROUP BY
+    TO_CHAR(t1.tahun, 'MM'),
+    DATE_PART('YEAR', t1.tahun),
+    t3.uraian,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs6,
+    t2.uraian_hs6,
+		t4.pelabuhan
+) a
+GROUP BY a.nama_prop
+ORDER BY SUM(CASE WHEN a.tahun = 2024 THEN a.nilai ELSE 0 END) desc limit 100
