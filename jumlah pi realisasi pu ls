@@ -1,0 +1,333 @@
+Cari dulu jumlah PI
+select f.nama "Kelompok Komoditi", e.nama "Nama Perizinan", concat('''', b.kode) "HS Code", concat('''', b.deskripsi) "Uraian", 
+	extract(year from d.tgl_terbit_izin) "Tahun Terbit", sum(c.volume) "Jumlah Alokasi", g.kd_insw "Satuan Alokasi", count (distinct d.id) "Jumlah PI"
+from (
+	select unnest(array[
+'64041110'
+
+]) hs
+) a 
+join mst_komoditi b on a.hs = b.kode 
+join permohonan_komoditas c on b.id = c.komoditi_id and c.is_komoditas_survey = false and c.is_petugas_hapus = false 
+join permohonan d on c.permohonan_id = d.id and d.is_v1 = false and d.no_izin is not null and d.tgl_terbit_izin is not null 
+join mst_perizinan e on d.perizinan_id = e.id and e.jenis_izin = 'PI'
+join mst_jenis_komoditi f on e.jenis_komoditi_id = f.id 
+join enumeration g on c.satuan_id = g.id
+where d.no_izin in (
+	select distinct unnest(string_to_array(z.izin_latest, ', '))
+	from (
+		select 
+			case when b.id is null then a.no_izin 
+			else (case when b.jenis_perizinan_id = 132 then a.no_izin
+				when b.jenis_perizinan_id = 121 then 
+					(case when b.mekanisme_perubhn_perp_id = 230 and c.id is null then b.no_izin 
+						when b.mekanisme_perubhn_perp_id = 231 and c.id is null then concat(a.no_izin, ', ', b.no_izin)
+						when c.jenis_perizinan_id = 132 and d.id is null then 
+							(case when b.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin)
+								when b.mekanisme_perubhn_perp_id = 230 then b.no_izin 
+							else null end)
+						when c.jenis_perizinan_id = 121 then 
+							(case when c.mekanisme_perubhn_perp_id = 230 and d.id is null then c.no_izin
+								when c.mekanisme_perubhn_perp_id = 231 and b.mekanisme_perubhn_perp_id = 231 and d.id is null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin)  
+								when d.jenis_perizinan_id = 132 and e.id is null and c.mekanisme_perubhn_perp_id = 230 then c.no_izin
+								when d.jenis_perizinan_id = 132 and e.id is null and c.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin)
+								when d.jenis_perizinan_id = 132 and e.id is not null and e.mekanisme_perubhn_perp_id = 230 then e.no_izin 
+								when d.jenis_perizinan_id = 121 then 
+									(case when d.mekanisme_perubhn_perp_id = 230 and e.id is null and c.mekanisme_perubhn_perp_id = 230 then d.no_izin 
+										when d.mekanisme_perubhn_perp_id = 230 and e.id is null and c.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin, ', ', d.no_izin)
+										when d.mekanisme_perubhn_perp_id = 231 and c.mekanisme_perubhn_perp_id = 231 and e.id is null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin)  
+										when e.jenis_perizinan_id = 132 and f.id is null and d.mekanisme_perubhn_perp_id = 230 then d.no_izin
+										when e.jenis_perizinan_id = 132 and f.id is null and d.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin)
+										when e.jenis_perizinan_id = 121 then 
+											(case when e.mekanisme_perubhn_perp_id = 230 and f.id is null then e.no_izin 
+												when e.mekanisme_perubhn_perp_id = 231 and f.id is not null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin, ', ', e.no_izin) 
+												when e.mekanisme_perubhn_perp_id = 231 and f.id is null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin, ', ', e.no_izin) 
+												when f.jenis_perizinan_id = 132 and g.id is null then e.no_izin
+												when f.jenis_perizinan_id = 121 and f.mekanisme_perubhn_perp_id = 230 and g.id is null then f.no_izin
+												when g.jenis_perizinan_id = 132 and h.id is null then f.no_izin
+												when g.jenis_perizinan_id = 121 and h.id is null then g.no_izin
+												when h.jenis_perizinan_id = 132 and i.id is null then g.no_izin 
+												when i.jenis_perizinan_id = 132 and j.id is not null then h.no_izin
+												when i.jenis_perizinan_id = 121 and j.id is null then i.no_izin
+												when l.id is not null then l.no_izin
+											else null end)
+									else null end)
+							else null end)
+					else null end)
+				else null end) 
+			end as izin_latest
+		from permohonan a 
+		left join permohonan b on a.id = b.no_perm_sebelumnya and b.is_v1 = false and b.no_izin is not null and b.tgl_terbit_izin is not null
+		left join permohonan c on b.id = c.no_perm_sebelumnya and c.is_v1 = false and c.no_izin is not null and c.tgl_terbit_izin is not null
+		left join permohonan d on c.id = d.no_perm_sebelumnya and d.is_v1 = false and d.no_izin is not null and d.tgl_terbit_izin is not null
+		left join permohonan e on d.id = e.no_perm_sebelumnya and e.is_v1 = false and e.no_izin is not null and e.tgl_terbit_izin is not null
+		left join permohonan f on e.id = f.no_perm_sebelumnya and f.is_v1 = false and f.no_izin is not null and f.tgl_terbit_izin is not null
+		left join permohonan g on f.id = g.no_perm_sebelumnya and g.is_v1 = false and g.no_izin is not null and g.tgl_terbit_izin is not null
+		left join permohonan h on g.id = h.no_perm_sebelumnya and h.is_v1 = false and h.no_izin is not null and h.tgl_terbit_izin is not null
+		left join permohonan i on h.id = i.no_perm_sebelumnya and i.is_v1 = false and i.no_izin is not null and i.tgl_terbit_izin is not null
+		left join permohonan j on i.id = j.no_perm_sebelumnya and j.is_v1 = false and j.no_izin is not null and j.tgl_terbit_izin is not null
+		left join permohonan k on j.id = k.no_perm_sebelumnya and k.is_v1 = false and k.no_izin is not null and k.tgl_terbit_izin is not null
+		left join permohonan l on k.id = l.no_perm_sebelumnya and l.is_v1 = false and l.no_izin is not null and l.tgl_terbit_izin is not null
+		where a.is_v1 = false and a.no_izin is not null and a.tgl_terbit_izin is not null
+			and a.jenis_perizinan_id = 111 and a.no_izin like '%PI%'
+	) z
+)
+group by f.nama, e.nama, b.kode, b.deskripsi, extract(year from d.tgl_terbit_izin), g.kd_insw
+order by f.nama, b.kode, extract(year from d.tgl_terbit_izin);
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+Cek PI nya apa saja
+select 
+    d.id as "ID PI",
+    f.nama as "Kelompok Komoditi", 
+    e.nama as "Nama Perizinan", 
+    concat('''', b.kode) as "HS Code", 
+    concat('''', b.deskripsi) as "Uraian", 
+    extract(year from d.tgl_terbit_izin) as "Tahun Terbit", 
+    c.volume as "Volume Alokasi", 
+    g.kd_insw as "Satuan Alokasi",
+    d.no_izin as "No Izin"
+from (
+    select unnest(array['50071020',
+'50071090',
+]) hs
+) a 
+join mst_komoditi b on a.hs = b.kode 
+join permohonan_komoditas c on b.id = c.komoditi_id 
+    and c.is_komoditas_survey = false 
+    and c.is_petugas_hapus = false 
+join permohonan d on c.permohonan_id = d.id 
+    and d.is_v1 = false 
+    and d.no_izin is not null 
+    and d.tgl_terbit_izin is not null 
+join mst_perizinan e on d.perizinan_id = e.id 
+    and e.jenis_izin = 'PI'
+join mst_jenis_komoditi f on e.jenis_komoditi_id = f.id 
+join enumeration g on c.satuan_id = g.id
+where extract(year from d.tgl_terbit_izin) IN (2024,2025) -- <<< FILTER TAHUN TERBIT HERE
+and d.no_izin in (
+    select distinct unnest(string_to_array(z.izin_latest, ', '))
+    from (
+        select 
+            case when b.id is null then a.no_izin 
+            else (case when b.jenis_perizinan_id = 132 then a.no_izin
+                when b.jenis_perizinan_id = 121 then 
+                    (case when b.mekanisme_perubhn_perp_id = 230 and c.id is null then b.no_izin 
+                        when b.mekanisme_perubhn_perp_id = 231 and c.id is null then concat(a.no_izin, ', ', b.no_izin)
+                        when c.jenis_perizinan_id = 132 and d.id is null then 
+                            (case when b.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin)
+                                when b.mekanisme_perubhn_perp_id = 230 then b.no_izin 
+                            else null end)
+                        when c.jenis_perizinan_id = 121 then 
+                            (case when c.mekanisme_perubhn_perp_id = 230 and d.id is null then c.no_izin
+                                when c.mekanisme_perubhn_perp_id = 231 and b.mekanisme_perubhn_perp_id = 231 and d.id is null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin)  
+                                when d.jenis_perizinan_id = 132 and e.id is null and c.mekanisme_perubhn_perp_id = 230 then c.no_izin
+                                when d.jenis_perizinan_id = 132 and e.id is null and c.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin)
+                                when d.jenis_perizinan_id = 132 and e.id is not null and e.mekanisme_perubhn_perp_id = 230 then e.no_izin 
+                                when d.jenis_perizinan_id = 121 then 
+                                    (case when d.mekanisme_perubhn_perp_id = 230 and e.id is null and c.mekanisme_perubhn_perp_id = 230 then d.no_izin 
+                                        when d.mekanisme_perubhn_perp_id = 230 and e.id is null and c.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin, ', ', d.no_izin)
+                                        when d.mekanisme_perubhn_perp_id = 231 and c.mekanisme_perubhn_perp_id = 231 and e.id is null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin)  
+                                        when e.jenis_perizinan_id = 132 and f.id is null and d.mekanisme_perubhn_perp_id = 230 then d.no_izin
+                                        when e.jenis_perizinan_id = 132 and f.id is null and d.mekanisme_perubhn_perp_id = 231 then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin)
+                                        when e.jenis_perizinan_id = 121 then 
+                                            (case when e.mekanisme_perubhn_perp_id = 230 and f.id is null then e.no_izin 
+                                                when e.mekanisme_perubhn_perp_id = 231 and f.id is not null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin, ', ', e.no_izin) 
+                                                when e.mekanisme_perubhn_perp_id = 231 and f.id is null then concat(a.no_izin, ', ', b.no_izin, ', ', c.no_izin, ', ', d.no_izin, ', ', e.no_izin) 
+                                                when f.jenis_perizinan_id = 132 and g.id is null then e.no_izin
+                                                when f.jenis_perizinan_id = 121 and f.mekanisme_perubhn_perp_id = 230 and g.id is null then f.no_izin
+                                                when g.jenis_perizinan_id = 132 and h.id is null then f.no_izin
+                                                when g.jenis_perizinan_id = 121 and h.id is null then g.no_izin
+                                                when h.jenis_perizinan_id = 132 and i.id is null then g.no_izin 
+                                                when i.jenis_perizinan_id = 132 and j.id is not null then h.no_izin
+                                                when i.jenis_perizinan_id = 121 and j.id is null then i.no_izin
+                                                when l.id is not null then l.no_izin
+                                            else null end)
+                                    else null end)
+                            else null end)
+                    else null end)
+                else null end) 
+            end as izin_latest
+        from permohonan a 
+        left join permohonan b on a.id = b.no_perm_sebelumnya and b.is_v1 = false and b.no_izin is not null and b.tgl_terbit_izin is not null
+        left join permohonan c on b.id = c.no_perm_sebelumnya and c.is_v1 = false and c.no_izin is not null and c.tgl_terbit_izin is not null
+        left join permohonan d on c.id = d.no_perm_sebelumnya and d.is_v1 = false and d.no_izin is not null and d.tgl_terbit_izin is not null
+        left join permohonan e on d.id = e.no_perm_sebelumnya and e.is_v1 = false and e.no_izin is not null and e.tgl_terbit_izin is not null
+        left join permohonan f on e.id = f.no_perm_sebelumnya and f.is_v1 = false and f.no_izin is not null and f.tgl_terbit_izin is not null
+        left join permohonan g on f.id = g.no_perm_sebelumnya and g.is_v1 = false and g.no_izin is not null and g.tgl_terbit_izin is not null
+        left join permohonan h on g.id = h.no_perm_sebelumnya and h.is_v1 = false and h.no_izin is not null and h.tgl_terbit_izin is not null
+        left join permohonan i on h.id = i.no_perm_sebelumnya and i.is_v1 = false and i.no_izin is not null and i.tgl_terbit_izin is not null
+        left join permohonan j on i.id = j.no_perm_sebelumnya and j.is_v1 = false and j.no_izin is not null and j.tgl_terbit_izin is not null
+        left join permohonan k on j.id = k.no_perm_sebelumnya and k.is_v1 = false and k.no_izin is not null and k.tgl_terbit_izin is not null
+        left join permohonan l on k.id = l.no_perm_sebelumnya and l.is_v1 = false and l.no_izin is not null and l.tgl_terbit_izin is not null
+        where a.is_v1 = false and a.no_izin is not null and a.tgl_terbit_izin is not null
+            and a.jenis_perizinan_id = 111 and a.no_izin like '%PI%'
+    ) z
+)
+order by d.id;
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+Cari Realisasi Pelaku Usaha by HS dan Kode PI
+select d.tahun_realisasi "tahun", b.no_izin "Nomor", concat('''', e.hs_code) "Kode HS", (select concat('''', deskripsi) from mst_komoditi where kode = e.hs_code) "Uraian Barang", 	
+	sum(e.volume_realisasi::numeric) "Volume", e.satuan_realisasi "Satuan"
+from pelaku_usaha a 	
+join permohonan b on a.id = b.pelaku_usaha_id and b.is_v1 = false 	
+	and b.no_izin is not null and b.tgl_terbit_izin is not null 
+join mst_perizinan c on b.perizinan_id = c.id 	
+join realisasi d on b.id = d.permohonan_id and (d.is_nihil is null or d.is_nihil = false)	
+join realisasi_anak e on d.id = e.realisasi_id and e.status_id = 18 	
+where c.jenis_izin in ('PI') and b.no_izin in (	'04.PI-76.23.0640',
+'04.PI-76.23.0643',
+
+
+)	and e.hs_code IN ('50071020',
+
+)
+group by b.no_izin, e.hs_code, e.satuan_realisasi, d.tahun_realisasi
+order by b.no_izin, e.hs_code; 	
+-------------------------------------------------------------------------
+Cari realisasi LS
+SELECT
+    p.no_izin AS "Nomor",
+    '''' || dateformat_idn(p.tgl_terbit_izin) AS "Tanggal Terbit Izin",
+    mk.kode AS "Kode HS",
+    '''' || regexp_replace(mk.deskripsi, E'[\\n\\r]+', ' ', 'g') AS "Uraian Barang",
+    SUM(
+        CASE
+            WHEN pks.volume_survey IS NOT NULL THEN pks.volume_survey
+            ELSE pks.volume_requested
+        END
+    ) AS "Volume",
+    CASE
+        WHEN pks.satuan_id_surveyed IS NOT NULL THEN pks.satuan_id_surveyed
+        ELSE (
+            SELECT e.code FROM enumeration e WHERE e.id = pks.satuan_id_requested
+        )
+    END AS "Satuan",
+    s.namaclient AS "Nama Eksportir",
+    (
+        SELECT mp.kode || '-' || mp.nama
+        FROM mst_pelabuhan mp
+        WHERE mp.id = pks.id_port_bongkar
+    ) AS "Pelabuhan Tujuan",
+    (
+        SELECT mn.nama
+        FROM mst_negara mn
+        WHERE mn.kode_alpha_2 = pks.origin
+    ) AS "Negara Asal",
+    NULL AS "Pelabuhan Asal"
+FROM pelaku_usaha pu
+JOIN permohonan p ON pu.id = p.pelaku_usaha_id
+JOIN permohonan_komoditas pk ON p.id = pk.permohonan_id
+JOIN mst_komoditi mk ON pk.komoditi_id = mk.id
+JOIN permohonan_komoditas_survey pks ON pk.id = pks.permohonan_komoditas_id
+    AND (
+        (pks.is_surveyed IS NOT TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS NOT TRUE AND pks.is_valid IS NOT TRUE AND pks.surveyor_id IS NOT NULL)
+        OR
+        (pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS NOT TRUE AND pks.is_valid IS NOT TRUE)
+        OR
+        (pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS TRUE AND pks.is_valid IS TRUE)
+    )
+JOIN surveyor s ON pks.surveyor_id = s.id
+WHERE p.no_izin IN ('04.PI-76.23.0640',
+) AND mk.kode IN ('50071020',
+
+)
+
+GROUP BY
+    p.no_izin, p.tgl_terbit_izin, mk.kode, mk.deskripsi,
+    pks.seq_no, pks.satuan_id_surveyed, pks.satuan_id_requested,
+    s.namaclient, pks.id_port_bongkar, pks.origin
+ORDER BY
+    p.no_izin, mk.kode ASC;
+------------------------------------------------------------------------------
+Cari realisasi data BPS
+SELECT
+  a.hs, a.uraian_hs,
+SUM(CASE WHEN a.tahun = 2024 THEN a.nilai ELSE 0 END) AS nilai_2024,
+SUM(CASE WHEN a.tahun = 2025 THEN a.nilai ELSE 0 END) AS nilai_2025,
+SUM(CASE WHEN a.tahun = 2024 THEN a.volume ELSE 0 END) AS volume_2024,
+SUM(CASE WHEN a.tahun = 2025 THEN a.volume ELSE 0 END) AS volume_2025
+FROM (
+  SELECT
+    TO_CHAR(t1.tahun, 'MM') AS bulan,
+    DATE_PART('YEAR', t1.tahun) AS tahun,
+    CONCAT(TO_CHAR(t1.tahun, 'MM'), '-', DATE_PART('YEAR', t1.tahun)) AS bulan_tahun,
+    t3.uraian AS nama_prop,
+		t4.uraian AS negara,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs,
+    t2.uraian_hs,
+		t5.pelabuhan AS pelabuhan,
+    SUM(t1.cifhsusd) AS nilai, 
+		SUM(t1.netwths) AS volume
+  FROM public.imp_2022 t1
+  LEFT JOIN public.master_hs2022 t2 ON t1.hs = t2.hs
+  LEFT JOIN public.master_propinsi t3 ON t1.kd_prop = t3.kd_prop
+	LEFT JOIN public.master_negara t4 ON t1.ctry_orig = t4.int_code
+	LEFT JOIN public.master_pelabuhan t5 ON t1.pel_huruf = t5.kd_huruf
+	WHERE 
+	t2.hs IN ('50071020',
+'50071090',
+
+)
+	GROUP BY
+    TO_CHAR(t1.tahun, 'MM'),
+    DATE_PART('YEAR', t1.tahun),
+    t3.uraian,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs,
+    t2.uraian_hs,
+		t4.uraian,
+		t5.pelabuhan
+) a
+GROUP BY a.hs, a.uraian_hs
+----------------------------------------------------------
+SELECT
+  a.hs, a.uraian_hs, a.negara, a.pelabuhan,
+SUM(CASE WHEN a.bulan = '01' AND a.tahun = 2025 THEN a.nilai ELSE 0 END) AS nilai_2025_01,
+SUM(CASE WHEN a.bulan = '02' AND a.tahun = 2025 THEN a.nilai ELSE 0 END) AS nilai_2025_02,
+SUM(CASE WHEN a.bulan = '03' AND a.tahun = 2025 THEN a.nilai ELSE 0 END) AS nilai_2025_03,
+SUM(CASE WHEN a.bulan = '04' AND a.tahun = 2025 THEN a.nilai ELSE 0 END) AS nilai_2025_04,
+
+-- VOLUME
+SUM(CASE WHEN a.bulan = '01' AND a.tahun = 2025 THEN a.volume ELSE 0 END) AS volume_2025_01,
+SUM(CASE WHEN a.bulan = '02' AND a.tahun = 2025 THEN a.volume ELSE 0 END) AS volume_2025_02,
+SUM(CASE WHEN a.bulan = '03' AND a.tahun = 2025 THEN a.volume ELSE 0 END) AS volume_2025_03,
+SUM(CASE WHEN a.bulan = '04' AND a.tahun = 2025 THEN a.volume ELSE 0 END) AS volume_2025_04
+FROM (
+  SELECT
+    TO_CHAR(t1.tahun, 'MM') AS bulan,
+    DATE_PART('YEAR', t1.tahun) AS tahun,
+    CONCAT(TO_CHAR(t1.tahun, 'MM'), '-', DATE_PART('YEAR', t1.tahun)) AS bulan_tahun,
+    t3.uraian AS nama_prop,
+		t4.uraian AS negara,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs,
+    t2.uraian_hs,
+		t5.pelabuhan AS pelabuhan,
+    SUM(t1.cifhsusd) AS nilai, 
+		SUM(t1.netwths) AS volume
+  FROM public.imp_2022 t1
+  LEFT JOIN public.master_hs2022 t2 ON t1.hs = t2.hs
+  LEFT JOIN public.master_propinsi t3 ON t1.kd_prop = t3.kd_prop
+	LEFT JOIN public.master_negara t4 ON t1.ctry_orig = t4.int_code
+	LEFT JOIN public.master_pelabuhan t5 ON t1.pel_huruf = t5.kd_huruf
+	WHERE 
+	t2.hs IN ('24011010',
+
+)
+	GROUP BY
+    TO_CHAR(t1.tahun, 'MM'),
+    DATE_PART('YEAR', t1.tahun),
+    t3.uraian,
+    t2.sektor_name,
+    t2.subsektor_name,
+    t2.hs,
+    t2.uraian_hs,
+		t4.uraian,
+		t5.pelabuhan
+) a
+GROUP BY a.hs, a.uraian_hs, a.negara, a.pelabuhan
