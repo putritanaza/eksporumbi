@@ -1,0 +1,40 @@
+SELECT s.jenis_ls_id, en.name,				
+	SUM(
+        CASE 				
+            WHEN pks.volume_survey IS NOT NULL THEN pks.volume_survey				
+            ELSE pks.volume_requested				
+        END				
+    ) AS "Volume",				
+	CASE 				
+		WHEN pks.satuan_id_surveyed IS NOT NULL THEN pks.satuan_id_surveyed				
+		ELSE (SELECT e.code FROM enumeration e WHERE e.id = pks.satuan_id_requested)			
+	END AS "Satuan",				
+	s.namaclient AS "Nama Client",				
+
+	-- Return only one value for Pelabuhan Tujuan (e.g., kode)
+	(SELECT mp.kode FROM mst_pelabuhan mp WHERE mp.id = pks.id_port_bongkar LIMIT 1) AS "Pelabuhan Tujuan",
+
+	(SELECT mn.nama FROM mst_negara mn WHERE mn.kode_alpha_2 = pks.origin LIMIT 1) AS "Negara Asal",				
+
+	NULL AS "Pelabuhan Asal"				
+
+FROM permohonan_komoditas_survey pks
+JOIN surveyor s ON pks.surveyor_id = s.id				
+JOIN enumeration en ON s.jenis_ls_id = en.id
+WHERE  
+(
+	(pks.is_surveyed IS NOT TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS NOT TRUE AND pks.is_valid IS NOT TRUE AND pks.surveyor_id IS NOT NULL)
+    OR
+    (pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS NOT TRUE AND pks.is_valid IS NOT TRUE)
+    OR 
+    (pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS TRUE AND pks.is_valid IS TRUE)
+		
+)
+
+GROUP BY 				s.jenis_ls_id, en.name,				
+	pks.satuan_id_surveyed, pks.satuan_id_requested,			
+	s.namaclient, pks.id_port_bongkar, pks.origin, mp.nama			
+
+ORDER BY p.no_izin, mk.kode ASC;
+
+SELECT * FROM enumeration e WHERE e.name ILIKE '%tekstil%' order by e.name
