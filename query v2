@@ -1,0 +1,425 @@
+------------------------------------------------------------------------------------------------------------------------------
+REKAP ALOKASI LS
+------------------------------------------------------------------------------------------------------------------------------
+SELECT DISTINCT
+    pu.nama_pelaku_usaha AS "Nama Importir",
+    concat('''', regexp_replace(pu.alamat_pelaku_usaha, E'[\\n\\r]+', ' ', 'g')) AS "Alamat",
+    mw1.nama AS "Provinsi",
+    concat(
+        '''',
+        regexp_replace((SELECT mp2.nama FROM mst_perizinan mp2 WHERE mp2.id = p.perizinan_id), E'[\\n\\r]+', ' ', 'g')
+    ) AS "Nama Dokumen",
+    p.no_izin AS "Nomor",
+    to_char(p.created_date, 'DD-MM-YYYY HH24:MI:SS') AS "Tanggal Aju",
+    to_char(p.tgl_terbit_izin, 'DD-MM-YYYY') AS "Tanggal Terbit Izin",
+    to_char(p.tgl_habis_izin, 'DD-MM-YYYY') AS "Tanggal Akhir Izin",
+    mk.kode AS "Kode HS",
+    concat('''', regexp_replace(mk.deskripsi, E'[\\n\\r]+', ' ', 'g')) AS "Uraian Barang",
+    pk.volume AS "Volume",
+    (SELECT e.code FROM enumeration e WHERE id = pk.satuan_id) AS "Satuan",
+    (
+        SELECT STRING_AGG(DISTINCT mp.nama, ', ')
+        FROM permohonan_komoditas_pelabuhan pkp
+        JOIN mst_pelabuhan mp ON pkp.pelabuhan_id = mp.id
+        WHERE pkp.permohonan_komoditas_id = pk.id
+        AND pkp.jenis_aktivitas = 37311
+    ) AS "Pelabuhan Tujuan",
+    (
+        SELECT STRING_AGG(DISTINCT mn.nama, ', ')
+        FROM permohonan_komoditas_negara pkn
+        JOIN mst_negara mn ON pkn.negara_id = mn.id
+        WHERE pkn.permohonan_komoditas_id = pk.id
+        AND pkn.jenis_aktivitas = 215
+    ) AS "Negara Asal",
+    (
+        SELECT STRING_AGG(DISTINCT mp.nama, ', ')
+        FROM permohonan_komoditas_pelabuhan pkp
+        JOIN mst_pelabuhan mp ON pkp.pelabuhan_id = mp.id
+        WHERE pkp.permohonan_komoditas_id = pk.id
+        AND pkp.jenis_aktivitas = 215
+    ) AS "Pelabuhan Asal"
+FROM pelaku_usaha pu
+JOIN permohonan p ON pu.id = p.pelaku_usaha_id
+JOIN permohonan_komoditas pk ON p.id = pk.permohonan_id
+JOIN mst_komoditi mk ON pk.komoditi_id = mk.id
+JOIN permohonan_pelaku_usaha ppu ON p.id = ppu.permohonan_id
+JOIN mst_wilayah mw2 ON ppu.kabupaten = mw2.id
+JOIN mst_wilayah mw1 ON mw1.id = mw2.parent
+WHERE pu.nib IN ('8120007861543')
+  AND EXTRACT(YEAR FROM p.tgl_terbit_izin) = 2025
+ORDER BY p.no_izin, mk.kode ASC;
+
+
+------------------------------------------------------------------------------------------------------------------------------
+REKAP DOKUMEN IT
+------------------------------------------------------------------------------------------------------------------------------
+SELECT A
+    .nama_pelaku_usaha "Nama Importir",
+    A.alamat_pelaku_usaha "Alamat",
+    ( SELECT nama FROM mst_wilayah WHERE ID = ( SELECT parent FROM mst_wilayah WHERE ID = A.kabupaten ) ) "Provinsi",
+    C.nama "Nama Dokumen",
+    b.no_izin "Nomor",
+    concat ( '''', datetimeformat_idn ( b.tgl_permohonan ) ) "Tanggal Aju",
+    concat ( '''', dateformat_idn ( b.tgl_terbit_izin ) ) "Tanggal Terbit",
+    concat ( '''', COALESCE ( dateformat_idn ( b.tgl_habis_izin ), 'Selama Perusahaan Aktif' ) ) "Tanggal Akhir" 
+FROM
+    pelaku_usaha
+    A JOIN permohonan b ON A.ID = b.pelaku_usaha_id 
+    AND b.is_v1 = FALSE 
+    AND b.no_izin IS NOT NULL 
+    AND b.tgl_terbit_izin
+    IS NOT NULL JOIN mst_perizinan C ON b.perizinan_id = C.ID 
+WHERE
+    C.jenis_izin IN ( 'IT', 'IP' ) 
+    AND A.nib IN ( '8120007861543', '8120202821159', '8120001721087', '8120212190227', '8120008851868', '9120004330684', '8120001831008' ) 
+ORDER BY
+    A.nama_pelaku_usaha;
+
+
+------------------------------------------------------------------------------------------------------------------------------
+REKAP DOKUMEN IT TAHUNAN
+------------------------------------------------------------------------------------------------------------------------------
+SELECT A
+    ."Nama Importir",
+    A."Alamat",
+    A."Provinsi",
+    A."Nama Dokumen",
+    A."Nomor",
+    A."Tanggal Aju",
+    A."Tanggal Terbit",
+    A."Tanggal Akhir",
+    A."Kode HS",
+    A."Uraian Barang",
+    SUM ( A."Volume" ) "Volume",
+    A."Satuan",
+    A."Pelabuhan Tujuan",
+    A."Negara Asal",
+    A."Pelabuhan Asal" 
+FROM
+    (
+    SELECT A
+        .nama_pelaku_usaha "Nama Importir",
+        A.alamat_pelaku_usaha "Alamat",
+        ( SELECT nama FROM mst_wilayah WHERE ID = ( SELECT parent FROM mst_wilayah WHERE ID = A.kabupaten ) ) "Provinsi",
+        C.nama "Nama Dokumen",
+        b.no_izin "Nomor",
+        concat ( '''', datetimeformat_idn ( b.tgl_permohonan ) ) "Tanggal Aju",
+        concat ( '''', dateformat_idn ( b.tgl_terbit_izin ) ) "Tanggal Terbit",
+        concat ( '''', COALESCE ( dateformat_idn ( b.tgl_habis_izin ), 'Selama Perusahaan Aktif' ) ) "Tanggal Akhir",
+        concat ( '''', e.kode ) "Kode HS",
+        concat ( '''', e.deskripsi ) "Uraian Barang",
+        d.volume "Volume",
+        f.kd_insw "Satuan",
+        (
+        SELECT
+            string_agg ( mp.nama, ', ' ORDER BY mp.nama ) 
+        FROM
+            permohonan_komoditas_pelabuhan pkp
+            JOIN mst_pelabuhan mp ON pkp.pelabuhan_id = mp.
+            ID JOIN enumeration ep ON pkp.jenis_aktivitas = ep.ID 
+        WHERE
+            pkp.permohonan_komoditas_id = d.ID 
+            AND ep.NAME = 'TUJUAN' 
+            AND pkp.is_active = TRUE 
+        ) "Pelabuhan Tujuan",
+        (
+        SELECT
+            string_agg ( mn.nama, ', ' ORDER BY mn.nama ) 
+        FROM
+            permohonan_komoditas_negara pkn
+            JOIN mst_negara mn ON pkn.negara_id = mn.
+            ID JOIN enumeration en ON pkn.jenis_aktivitas = en.ID 
+        WHERE
+            pkn.permohonan_komoditas_id = d.ID 
+            AND en.NAME = 'ASAL' 
+            AND pkn.is_active = TRUE 
+        ) "Negara Asal",
+        (
+        SELECT
+            string_agg ( mp.nama, ', ' ORDER BY mp.nama ) 
+        FROM
+            permohonan_komoditas_pelabuhan pkp
+            JOIN mst_pelabuhan mp ON pkp.pelabuhan_id = mp.
+            ID JOIN enumeration ep ON pkp.jenis_aktivitas = ep.ID 
+        WHERE
+            pkp.permohonan_komoditas_id = d.ID 
+            AND ep.NAME = 'ASAL' 
+            AND pkp.is_active = TRUE 
+        ) "Pelabuhan Asal" 
+    FROM
+        pelaku_usaha
+        A JOIN permohonan b ON A.ID = b.pelaku_usaha_id 
+        AND b.is_v1 = FALSE 
+        AND b.no_izin IS NOT NULL 
+        AND b.tgl_terbit_izin IS NOT NULL 
+        AND EXTRACT ( YEAR FROM b.tgl_terbit_izin ) = 2025
+        JOIN mst_perizinan C ON b.perizinan_id = C.
+        ID JOIN permohonan_komoditas d ON b.ID = d.permohonan_id 
+        AND d.is_komoditas_survey = FALSE 
+        AND d.is_petugas_hapus =
+        FALSE JOIN mst_komoditi e ON d.komoditi_id = e.
+        ID JOIN enumeration f ON d.satuan_id = f.ID 
+    WHERE
+        C.jenis_izin IN ( 'PI' ) 
+        AND A.nib IN ( '8120007861543', '8120202821159', '8120001721087', '8120212190227', '8120008851868', '9120004330684', '8120001831008' ) 
+    ) A 
+GROUP BY
+    A."Nama Importir",
+    A."Alamat",
+    A."Provinsi",
+    A."Nama Dokumen",
+    A."Nomor",
+    A."Tanggal Aju",
+    A."Tanggal Terbit",
+    A."Tanggal Akhir",
+    A."Kode HS",
+    A."Uraian Barang",
+    A."Satuan",
+    A."Pelabuhan Tujuan",
+    A."Negara Asal",
+    A."Pelabuhan Asal" 
+ORDER BY
+    A."Nama Importir",
+    A."Tanggal Terbit",
+    A."Nomor",
+    A."Kode HS";
+
+
+------------------------------------------------------------------------------------------------------------------------------
+REKAP REALISASI LS
+------------------------------------------------------------------------------------------------------------------------------
+SELECT P
+    .no_izin AS "Nomor",
+    to_char( P.tgl_terbit_izin, 'DD-MM-YYYY' ) AS "Tanggal Terbit Izin",
+    mk.kode AS "Kode HS",
+    concat ( '''', regexp_replace( mk.deskripsi, E'[\\n\\r]+', ' ', 'g' ) ) AS "Uraian Barang",
+    SUM ( CASE WHEN pks.volume_survey IS NOT NULL THEN pks.volume_survey ELSE pks.volume_requested END ) AS "Volume",
+CASE
+        
+        WHEN pks.satuan_id_surveyed IS NOT NULL THEN
+        pks.satuan_id_surveyed ELSE ( SELECT e.code FROM enumeration e WHERE e.ID = pks.satuan_id_requested ) 
+    END AS "Satuan",
+    s.namaclient AS "Nama Eksportir",
+    ( SELECT mp.kode || '-' || mp.nama FROM mst_pelabuhan mp WHERE mp.ID = pks.id_port_bongkar ) AS "Pelabuhan Tujuan",
+    ( SELECT mn.nama FROM mst_negara mn WHERE mn.kode_alpha_2 = pks.origin ) AS "Negara Asal",
+    NULL AS "Pelabuhan Asal" 
+FROM
+    pelaku_usaha pu
+    JOIN permohonan P ON pu.ID = P.pelaku_usaha_id
+    JOIN permohonan_komoditas pk ON P.ID = pk.permohonan_id
+    JOIN mst_komoditi mk ON pk.komoditi_id = mk.
+    ID JOIN permohonan_komoditas_survey pks ON pk.ID = pks.permohonan_komoditas_id 
+    AND (
+        (
+            pks.is_surveyed IS NOT TRUE 
+            AND pks.is_cancelled IS NOT TRUE 
+            AND pks.is_json IS NOT TRUE 
+            AND pks.is_valid IS NOT TRUE 
+            AND pks.surveyor_id IS NOT NULL 
+        ) -- XML kondisi 1
+        
+        OR ( pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS NOT TRUE AND pks.is_valid IS NOT TRUE ) -- XML kondisi 2
+        
+        OR ( pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS TRUE AND pks.is_valid IS TRUE ) -- JSON
+        
+    )
+    JOIN surveyor s ON pks.surveyor_id = s.ID 
+WHERE
+    pu.nib IN ( '8120001721087' ) 
+    AND EXTRACT ( YEAR FROM P.tgl_terbit_izin ) IN ( 2024 ) 
+GROUP BY
+    P.no_izin,
+    P.tgl_terbit_izin,
+    mk.kode,
+    mk.deskripsi,
+    pks.satuan_id_surveyed,
+    pks.satuan_id_requested,
+    s.namaclient,
+    pks.id_port_bongkar,
+    pks.origin 
+ORDER BY
+    P.no_izin,
+    mk.kode ASC;
+
+
+------------------------------------------------------------------------------------------------------------------------------
+REKAP REALISASI PI TAHUNAN
+------------------------------------------------------------------------------------------------------------------------------
+SELECT
+    b.no_izin "Nomor",
+    concat ( '''', e.hs_code ) "Kode HS",
+    ( SELECT concat ( '''', deskripsi ) FROM mst_komoditi WHERE kode = e.hs_code ) "Uraian Barang",
+    SUM ( e.volume_realisasi :: NUMERIC ) "Volume",
+    e.satuan_realisasi "Satuan",
+    ( SELECT nama FROM mst_pelabuhan WHERE kode = e.pelabuhan ) "Pelabuhan",
+    '-' "Tanggal Tiba",
+    '-' "Nama Ekspor",
+    '-' "Negara Asal",
+    '-' "Pelabuhan Asal" 
+FROM
+    pelaku_usaha
+    A JOIN permohonan b ON A.ID = b.pelaku_usaha_id 
+    AND b.is_v1 = FALSE 
+    AND b.no_izin IS NOT NULL 
+    AND b.tgl_terbit_izin IS NOT NULL 
+    AND EXTRACT ( YEAR FROM b.tgl_terbit_izin ) IN ( 2024 )
+    JOIN mst_perizinan C ON b.perizinan_id = C.
+    ID JOIN realisasi d ON b.ID = d.permohonan_id 
+    AND ( d.is_nihil IS NULL OR d.is_nihil = FALSE )
+    JOIN realisasi_anak e ON d.ID = e.realisasi_id 
+    AND e.status_id = 18 
+WHERE
+    C.jenis_izin IN ( 'PI' ) 
+    AND A.nib IN ( '8120007861543') 
+GROUP BY
+    b.no_izin,
+    e.hs_code,
+    e.satuan_realisasi,
+    e.pelabuhan 
+ORDER BY
+    b.no_izin,
+    e.hs_code;
+
+
+------------------------------------------------------------------------------------------------------------------------------
+REKAP ALOKASI DAN REALISASI PI KOMODITAS PANGAN
+------------------------------------------------------------------------------------------------------------------------------
+SELECT C
+    .nama,
+    b.nama,
+    COUNT ( DISTINCT ( CASE WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 THEN A.ID ELSE NULL END ) ) tahun_aju_2025,
+    concat ( '''', e.kode ) kode_hs_2025,
+    SUM ( CASE WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 THEN COALESCE ( d.volume_pengajuan, d.volume ) ELSE NULL END ) volume_aju_2025,
+    string_agg ( DISTINCT ( CASE WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 THEN f.kd_insw ELSE NULL END ), ', ' ) satuan_aju_2025,
+    SUM ( CASE WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 AND A.tgl_terbit_izin IS NOT NULL THEN d.volume ELSE NULL END ) volume_terbit_2025,
+    string_agg (
+        DISTINCT ( CASE WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 AND A.tgl_terbit_izin IS NOT NULL THEN f.kd_insw ELSE NULL END ),
+        ', ' 
+    ) satuan_terbit_2025,
+    SUM (
+    CASE
+            
+            WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 
+            AND A.tgl_terbit_izin IS NOT NULL THEN
+                (
+                SELECT SUM
+                    ( volume_realisasi :: NUMERIC ) 
+                FROM
+                    realisasi_anak 
+                WHERE
+                    hs_code = e.kode 
+                    AND satuan_realisasi = f.kd_insw 
+                    AND status_id = 18 
+                    AND realisasi_id IN ( SELECT ID FROM realisasi WHERE permohonan_id = A.ID AND is_nihil IS NOT TRUE ) 
+                ) ELSE NULL 
+            END 
+            ) volume_realisasi_2025,
+            string_agg (
+                DISTINCT (
+                CASE
+                        
+                        WHEN EXTRACT ( YEAR FROM A.created_date ) = 2025 
+                        AND A.tgl_terbit_izin IS NOT NULL THEN
+                            (
+                            SELECT DISTINCT
+                                satuan_realisasi 
+                            FROM
+                                realisasi_anak 
+                            WHERE
+                                hs_code = e.kode 
+                                AND satuan_realisasi = f.kd_insw 
+                                AND status_id = 18 
+                                AND realisasi_id IN ( SELECT ID FROM realisasi WHERE permohonan_id = A.ID AND is_nihil IS NOT TRUE ) 
+                            ) ELSE NULL 
+                        END 
+                        ),
+                        ', ' 
+                    ) satuan_realisasi_2025 
+                FROM
+                    permohonan
+                    A JOIN mst_perizinan b ON A.perizinan_id = b.ID 
+                    AND b.jenis_izin = 'PI'
+                    JOIN mst_jenis_komoditi C ON b.jenis_komoditi_id = C.ID 
+                    AND C.nama IN ( 'Beras', 'Beras Keperluan Lain', 'Beras Keperluan Umum' )
+                    JOIN permohonan_komoditas d ON A.ID = d.permohonan_id 
+                    AND d.is_petugas_hapus = FALSE 
+                    AND d.is_komoditas_survey =
+                    FALSE JOIN mst_komoditi e ON d.komoditi_id = e.
+                    ID JOIN enumeration f ON d.satuan_id = f.ID 
+                WHERE
+                    EXTRACT ( YEAR FROM A.created_date ) IN ( 2023, 2024, 2025 ) 
+                    AND A.ID IN (
+                    SELECT
+                    CASE
+                            
+                        WHEN M
+                            .jenis_perizinan_id = 121 
+                            AND M.mekanisme_perubhn_perp_id = 230 THEN
+                                M.ID 
+                                WHEN l.jenis_perizinan_id = 121 
+                                AND l.mekanisme_perubhn_perp_id = 230 THEN
+                                    l.ID 
+                                    WHEN K.jenis_perizinan_id = 121 
+                                    AND K.mekanisme_perubhn_perp_id = 230 THEN
+                                        K.ID 
+                                        WHEN j.jenis_perizinan_id = 121 
+                                        AND j.mekanisme_perubhn_perp_id = 230 THEN
+                                            j.ID 
+                                            WHEN i.jenis_perizinan_id = 121 
+                                            AND i.mekanisme_perubhn_perp_id = 230 THEN
+                                                i.ID 
+                                                WHEN h.jenis_perizinan_id = 121 
+                                                AND h.mekanisme_perubhn_perp_id = 230 THEN
+                                                    h.ID 
+                                                    WHEN G.jenis_perizinan_id = 121 
+                                                    AND G.mekanisme_perubhn_perp_id = 230 THEN
+                                                        G.ID 
+                                                        WHEN f.jenis_perizinan_id = 121 
+                                                        AND f.mekanisme_perubhn_perp_id = 230 THEN
+                                                            f.ID 
+                                                            WHEN e.jenis_perizinan_id = 121 
+                                                            AND e.mekanisme_perubhn_perp_id = 230 THEN
+                                                                e.ID 
+                                                                WHEN d.jenis_perizinan_id = 121 
+                                                                AND d.mekanisme_perubhn_perp_id = 230 THEN
+                                                                    d.ID 
+                                                                    WHEN C.jenis_perizinan_id = 121 
+                                                                    AND C.mekanisme_perubhn_perp_id = 230 THEN
+                                                                        C.ID 
+                                                                        WHEN b.jenis_perizinan_id = 121 
+                                                                        AND b.mekanisme_perubhn_perp_id = 230 THEN
+                                                                            b.ID ELSE A.ID 
+                                                                        END latest 
+            FROM        permohonan
+        A LEFT JOIN permohonan b ON A.ID = b.no_perm_sebelumnya
+    LEFT JOIN permohonan C ON b.ID = C.no_perm_sebelumnya
+    LEFT JOIN permohonan d ON C.ID = d.no_perm_sebelumnya
+    LEFT JOIN permohonan e ON d.ID = e.no_perm_sebelumnya
+    LEFT JOIN permohonan f ON e.ID = f.no_perm_sebelumnya
+    LEFT JOIN permohonan G ON f.ID = G.no_perm_sebelumnya
+    LEFT JOIN permohonan h ON G.ID = h.no_perm_sebelumnya
+    LEFT JOIN permohonan i ON h.ID = i.no_perm_sebelumnya
+    LEFT JOIN permohonan j ON i.ID = j.no_perm_sebelumnya
+    LEFT JOIN permohonan K ON j.ID = K.no_perm_sebelumnya
+    LEFT JOIN permohonan l ON K.ID = l.no_perm_sebelumnya
+    LEFT JOIN permohonan M ON l.ID = M.no_perm_sebelumnya 
+    WHERE
+    A.is_v1 = FALSE 
+    AND A.jenis_perizinan_id = 111 
+        AND A.kantor_id = 66 
+        AND EXISTS (
+        SELECT 1 
+    FROM
+                                                        permohonan_komoditas 
+    WHERE
+    is_komoditas_survey = FALSE 
+        AND is_petugas_hapus = FALSE 
+    AND permohonan_id = A.ID 
+    AND komoditi_id IN ( SELECT ID FROM mst_komoditi WHERE kode IN ( '10063050', '10063060', '10063070' ) ) 
+    ) 
+            ) 
+    GROUP BY
+    C.nama,
+    b.nama,
+    e.kode,
+    f.kd_insw;
