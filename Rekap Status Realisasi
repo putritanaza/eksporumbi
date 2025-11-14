@@ -1,0 +1,24 @@
+SELECT DISTINCT
+	permohonan_pelaku_usaha.nama_pelaku_usaha "Nama Perusahaan",
+	permohonan.no_izin "Nomor Izin",
+	mst_perizinan.tampilan_di_cetakan "Nama Perizinan",
+	status_izin_real.alt_name "Status Izin Realisasi",
+	status_lapor_real.NAME "Status Laporan Realisasi",
+	wfd_state.label_petugas "Status Permohonan",
+	( dateformat_idn ( permohonan.tgl_terbit_izin ) ) "Tanggal Terbit" 
+FROM
+	permohonan
+	JOIN wfd_state ON wfd_state.ID = permohonan.status_permohonan
+	LEFT JOIN realisasi ON realisasi.permohonan_id = permohonan.
+	ID LEFT JOIN enumeration AS status_izin_real ON status_izin_real.ID = permohonan.status_izin_realisasi
+	LEFT JOIN mst_perizinan ON mst_perizinan.ID = permohonan.perizinan_id
+	LEFT JOIN permohonan_pelaku_usaha ON permohonan_pelaku_usaha.permohonan_id = permohonan.
+	ID LEFT JOIN realisasi_anak ON realisasi_anak.realisasi_id = realisasi.
+	ID LEFT JOIN enumeration AS status_lapor_real ON status_lapor_real.ID = realisasi_anak.status_id 
+	LIMIT 100
+
+
+
+The result with that query will have this header:
+
+Nama Perusahaan	|| Nomor Izin	|| Nama Perizinan	|| Status Izin Realisasi	|| Status Laporan Realisasi ||	Status Permohonan	Tanggal Terbit
