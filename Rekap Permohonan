@@ -1,0 +1,21 @@
+SELECT DISTINCT
+	mst_perizinan.nama "Nama Perizinan",
+	permohonan.no_permohonan "Nomor Permohonan",
+	( datetimeformat_idn ( permohonan.tgl_permohonan ) ) "Tanggal Permohonan",
+	permohonan.no_izin "Nomor Izin",
+	( dateformat_idn ( permohonan.tgl_terbit_izin ) ) "Tanggal Izin",
+	( dateformat_idn ( permohonan.tgl_habis_izin ) ) "Tanggal Habis Izin",
+	status_izin.alt_name "Status Dokumen",
+	wfd_state.label_petugas "Status Permohonan",
+	jenis_permohonan.NAME "Jenis Permohonan" 
+FROM
+	permohonan
+	LEFT JOIN enumeration AS jenis_permohonan ON jenis_permohonan.ID = permohonan.jenis_perizinan_id
+	JOIN wfd_state ON wfd_state.ID = permohonan.status_permohonan
+	LEFT JOIN enumeration AS status_izin ON status_izin.ID = permohonan.status_izin_id
+	LEFT JOIN mst_perizinan ON mst_perizinan.ID = permohonan.perizinan_id 
+	LIMIT 100
+
+The result with this query will have this header:
+
+Nama Perizinan ||	Nomor Permohonan ||	Tanggal Permohonan ||	Nomor Izin ||	Tanggal Izin ||	Tanggal Habis Izin ||	Status Dokumen ||	Status Permohonan ||	Jenis Permohonan
