@@ -1,0 +1,148 @@
+SELECT 	en.name,
+	EXTRACT(YEAR FROM s.tgl_ls) :: INT AS tahun,
+	mk.kode,
+	s.nama_perush,
+	pu.jenis_api,
+	SUM(CASE WHEN pks.volume_survey IS NOT NULL THEN pks.volume_survey ELSE pks.volume_requested END) AS "Volume",
+	CASE
+		WHEN pks.satuan_id_surveyed IS NOT NULL THEN
+			pks.satuan_id_surveyed
+		ELSE
+			(SELECT e.code FROM enumeration e WHERE e.id = pks.satuan_id_requested)
+	END AS "Satuan",
+	-- Return only one value for Pelabuhan Tujuan (e.g., kode)
+	NULL AS "Pelabuhan Masuk",
+	(SELECT mp.kode || ' - ' || mp.nama FROM mst_pelabuhan mp WHERE mp.id = pks.id_port_bongkar LIMIT 1) AS "Pelabuhan Bongkar",
+	(SELECT mn.nama FROM mst_negara mn WHERE mn.kode_alpha_2 = pks.origin LIMIT 1) AS "Negara Asal",
+	pks.uraian_barang
+FROM
+	permohonan_komoditas_survey pks
+	JOIN permohonan_komoditas pk ON pks.permohonan_komoditas_id = pk.id
+	JOIN mst_komoditi mk ON pk.komoditi_id = mk.id
+	JOIN surveyor s ON pks.surveyor_id = s.id
+	JOIN enumeration en ON s.jenis_ls_id = en.id
+	LEFT JOIN pelaku_usaha pu ON s.npwp_perush = pu.npwp
+WHERE
+	(
+		(
+			pks.is_surveyed IS NOT TRUE
+			AND pks.is_cancelled IS NOT TRUE
+			AND pks.is_json IS NOT TRUE
+			AND pks.is_valid IS NOT TRUE
+			AND pks.surveyor_id IS NOT NULL
+		)
+		OR (pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS NOT TRUE AND pks.is_valid IS NOT TRUE)
+		OR (pks.is_surveyed IS TRUE AND pks.is_cancelled IS NOT TRUE AND pks.is_json IS TRUE AND pks.is_valid IS TRUE)
+	)
+	AND mk.kode IN (
+		'69010000',
+		'69041000',
+		'69049000',
+		'69051000',
+		'69059000',
+		'69060000',
+		'69072110',
+		'69072121',
+		'69072122',
+		'69072123',
+		'69072124',
+		'69072191',
+		'69072192',
+		'69072193',
+		'69072194',
+		'69072211',
+		'69072212',
+		'69072213',
+		'69072214',
+		'69072291',
+		'69072292',
+		'69072293',
+		'69072294',
+		'69072311',
+		'69072312',
+		'69072313',
+		'69072314',
+		'69072391',
+		'69072392',
+		'69072393',
+		'69072394',
+		'69073011',
+		'69073019',
+		'69073091',
+		'69073099',
+		'69074010',
+		'69074021',
+		'69074022',
+		'69074091',
+		'69074092',
+		'69091100',
+		'69091900',
+		'69099000',
+		'69101000',
+		'69109000',
+		'69111000',
+		'69119000',
+		'69120000',
+		'69131010',
+		'69131090',
+		'69139010',
+		'69139090',
+		'69141000',
+		'69149000',
+		'70031210',
+		'70031220',
+		'70031290',
+		'70031910',
+		'70031920',
+		'70031990',
+		'70032010',
+		'70032090',
+		'70033010',
+		'70033090',
+		'70042010',
+		'70042020',
+		'70042090',
+		'70049010',
+		'70049020',
+		'70049090',
+		'70051010',
+		'70051090',
+		'70052110',
+		'70052120',
+		'70052190',
+		'70052910',
+		'70052920',
+		'70052990',
+		'70053010',
+		'70053090',
+		'70060000',
+		'70060090',
+		'70071110',
+		'70071120',
+		'70071190',
+		'70071910',
+		'70071990',
+		'70072110',
+		'70072120',
+		'70072190',
+		'70072910',
+		'70072990'
+	)
+	AND s.tgl_ls BETWEEN '2024-01-01'
+	AND '2026-06-30'
+GROUP BY
+	mk.kode,
+	s.jenis_ls_id,
+	en.name,
+	pks.satuan_id_surveyed,
+	pks.satuan_id_requested,
+	s.namaclient,
+	pks.id_port_bongkar,
+	pks.origin,
+	s.tgl_ls,
+	pu.jenis_api,
+	pks.uraian_barang,
+	s.nama_perush
+ORDER BY
+	s.tgl_ls,
+	s.nama_perush
