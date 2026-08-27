@@ -1,0 +1,169 @@
+WITH realisasi_data AS (
+    SELECT 
+        b.no_izin AS no_izin,
+        e.hs_code AS hs_code,
+        SUM(e.volume_realisasi::numeric) AS volume_realisasi,
+        e.satuan_realisasi AS satuan_realisasi
+    FROM pelaku_usaha a
+    JOIN permohonan b 
+        ON a.id = b.pelaku_usaha_id
+        AND b.is_v1 = false
+        AND b.no_izin IS NOT NULL
+        AND b.tgl_terbit_izin IS NOT NULL
+        AND b.tgl_terbit_izin BETWEEN '2024-01-01' AND '2026-06-30'
+    JOIN mst_perizinan c 
+        ON b.perizinan_id = c.id
+    JOIN realisasi d 
+        ON b.id = d.permohonan_id
+        AND (d.is_nihil IS NULL OR d.is_nihil = false)
+    JOIN realisasi_anak e 
+        ON d.id = e.realisasi_id
+        AND e.status_id = 18
+    GROUP BY 
+        b.no_izin,
+        e.hs_code,
+        e.satuan_realisasi
+),
+
+izin_data AS (
+    SELECT b.flag_probis,
+        b.nama AS jenis_izin,
+        a.no_izin,
+        CONCAT('''', dateformat_idn(a.tgl_terbit_izin)) AS tgl_terbit,
+        CONCAT('''', dateformat_idn(a.tgl_awal)) AS tgl_awal,
+        CASE 
+            WHEN a.tgl_habis_izin IS NOT NULL 
+                THEN CONCAT('''', dateformat_idn(a.tgl_habis_izin))
+            ELSE 'Selama perusahaan aktif'
+        END AS tgl_habis,
+        e.nama_pelaku_usaha,
+        CONCAT('''', e.nib) AS nib,
+        CASE 
+            WHEN e.npwp16 IS NOT NULL 
+                THEN CONCAT('''', e.npwp16)
+            ELSE NULL
+        END AS npwp16,
+        CASE 
+            WHEN e.npwp IS NOT NULL 
+                THEN CONCAT('''', e.npwp)
+            ELSE NULL
+        END AS npwp,
+        g.kode AS hs_code,
+        g.deskripsi,
+        f.volume AS volume_izin,
+        h.name AS satuan_izin,
+        
+        (
+            SELECT string_agg(mn.nama, ', ' ORDER BY pkn.id)
+            FROM permohonan_komoditas_negara pkn
+            JOIN mst_negara mn 
+                ON pkn.negara_id = mn.id
+            JOIN enumeration en 
+                ON pkn.jenis_aktivitas = en.id
+            WHERE pkn.permohonan_komoditas_id = f.id
+                AND en.name = 'ASAL'
+        ) AS neg_asal,
+        
+        (
+            SELECT string_agg(mp.nama, ', ' ORDER BY pkp.id)
+            FROM permohonan_komoditas_pelabuhan pkp
+            JOIN mst_pelabuhan mp 
+                ON pkp.pelabuhan_id = mp.id
+            JOIN enumeration ep 
+                ON pkp.jenis_aktivitas = ep.id
+            WHERE pkp.permohonan_komoditas_id = f.id
+                AND ep.name = 'MUAT'
+        ) AS plb_muat,
+        
+        (
+            SELECT string_agg(mp.nama, ', ' ORDER BY pkp.id)
+            FROM permohonan_komoditas_pelabuhan pkp
+            JOIN mst_pelabuhan mp 
+                ON pkp.pelabuhan_id = mp.id
+            JOIN enumeration ep 
+                ON pkp.jenis_aktivitas = ep.id
+            WHERE pkp.permohonan_komoditas_id = f.id
+                AND ep.name = 'TUJUAN'
+        ) AS plb_tujuan
+        
+    FROM permohonan a
+    JOIN mst_perizinan b 
+        ON a.perizinan_id = b.id
+    JOIN enumeration c 
+        ON a.jenis_perizinan_id = c.id
+    JOIN wfd_state d 
+        ON a.status_permohonan = d.id
+    JOIN permohonan_pelaku_usaha e 
+        ON a.id = e.permohonan_id
+    LEFT JOIN permohonan_komoditas f 
+        ON a.id = f.permohonan_id
+        AND f.is_petugas_hapus = false
+        AND f.is_komoditas_survey = false
+    LEFT JOIN mst_komoditi g 
+        ON f.komoditi_id = g.id
+    LEFT JOIN enumeration h 
+        ON f.satuan_id = h.id
+        
+    WHERE a.tgl_terbit_izin BETWEEN '2024-01-01' AND '2026-06-30'
+		and b.nama ILIKE ANY (
+            ARRAY[
+                '%timah%', '%pupuk%', '%bahan bakar%'
+            ]
+        )
+        AND LENGTH(g.kode) = 8
+    
+    AND a.perizinan_id IN (
+        
+        SELECT mp1.id
+        FROM mst_perizinan mp1
+        WHERE mp1.flag_probis = 'I'
+        
+        UNION
+        
+        SELECT DISTINCT mp2.id
+        FROM mst_komoditi mk1
+        JOIN mst_peraturan_komoditi pr
+            ON mk1.id = pr.komoditi_id
+        JOIN mst_perizinan mp2
+            ON pr.peraturan_id = mp2.peraturan_id
+        WHERE mk1.kode ILIKE ANY (
+            ARRAY[
+                '%timah%', '%pupuk%', '%bahan bakar%'
+            ]
+        )
+        AND LENGTH(mk1.kode) = 8
+        AND mp2.flag_probis = 'I'
+        
+        UNION
+        
+        SELECT DISTINCT mp3.id
+        FROM mst_komoditi mk2
+        JOIN permohonan_komoditas pk
+            ON mk2.id = pk.komoditi_id
+            AND pk.is_petugas_hapus = false
+            AND pk.is_komoditas_survey = false
+        JOIN permohonan p
+            ON pk.permohonan_id = p.id
+        JOIN mst_perizinan mp3
+            ON p.perizinan_id = mp3.id
+        WHERE mk2.kode ILIKE ANY (
+            ARRAY[
+                '%timah%', '%pupuk%', '%bahan bakar%'
+            ]
+        )
+        AND LENGTH(mk2.kode) = 8
+    )
+)
+
+SELECT
+    i.*,
+    r.volume_realisasi,
+    r.satuan_realisasi
+FROM izin_data i
+JOIN realisasi_data r
+    ON i.no_izin = r.no_izin
+    AND i.hs_code = r.hs_code
+ORDER BY
+		i.tgl_terbit,
+    i.no_izin,
+    i.hs_code;
