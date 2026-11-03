@@ -1,0 +1,34 @@
+SELECT DISTINCT
+    pu.nama_pelaku_usaha AS "Nama Importir",
+    concat('''', regexp_replace(mp.nama, E'[\n\r]+', ' ', 'g')) AS "Nama Dokumen",
+    p.no_izin AS "Nomor", s.no_ls,
+    concat('''', datetimeformat_idn(p.created_date)) AS "Tanggal Aju",
+    concat('''', dateformat_idn(p.tgl_terbit_izin)) AS "Tanggal Terbit Izin",
+    concat('''', dateformat_idn(p.tgl_habis_izin)) AS "Tanggal Akhir Izin",
+    mk.kode AS "Kode HS",
+    concat('''', regexp_replace(mk.deskripsi, E'[\n\r]+', ' ', 'g')) AS "Uraian Barang",
+    pk.volume AS "Volume",
+    (
+        SELECT e.code
+        FROM enumeration e
+        WHERE e.id = pk.satuan_id
+    ) AS "Satuan"
+FROM pelaku_usaha pu
+JOIN permohonan p
+    ON pu.id = p.pelaku_usaha_id
+JOIN mst_perizinan mp
+    ON mp.id = p.perizinan_id
+JOIN permohonan_komoditas pk
+    ON p.id = pk.permohonan_id
+JOIN permohonan_komoditas_survey pks ON pk.id = pks.permohonan_komoditas_id 
+JOIN surveyor s ON pks.surveyor_id = s.id
+JOIN mst_komoditi mk
+    ON pk.komoditi_id = mk.id
+JOIN permohonan_pelaku_usaha ppu
+    ON p.id = ppu.permohonan_id
+JOIN mst_wilayah mw2
+    ON ppu.kabupaten = mw2.id
+JOIN mst_wilayah mw1
+    ON mw1.id = mw2.parent
+WHERE EXTRACT(YEAR FROM p.tgl_terbit_izin) = 2026 and mp.nama ilike '%batubara%'
+ORDER BY p.no_izin, mk.kode ASC;
